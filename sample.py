@@ -26,6 +26,8 @@ def main(
     width: int = 1024,
     height: int = 1024,
     compile: bool = False,
+    fp16_acc_matmul: bool = False,
+    patch_parallelism: bool = False,
     distrifusion_warmup_steps: int = 4,
     out_path: str = "sample.png",
     verbose: bool = False,
@@ -34,6 +36,8 @@ def main(
         width=width,
         height=height,
         compile_unet=compile,
+        fp16_acc_matmul=fp16_acc_matmul,
+        patch_parallelism=patch_parallelism,
         warmup_steps=distrifusion_warmup_steps,
         verbose=verbose,
     )

@@ -9,6 +9,8 @@ from torch._C._distributed_c10d import Work, ProcessGroup  # type: ignore
 class BasedXLConfig:
     pretrained_model_name_or_path: str = "stabilityai/stable-diffusion-xl-base-1.0"
     dtype: torch.dtype = torch.float16
+    fp16_acc_matmul: bool = False
+    patch_parallelism: bool = False
     compile_unet: bool = False
     width: int = 1024
     height: int = 1024
