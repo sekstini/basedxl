@@ -1,0 +1,16 @@
+[project]
+name = "basedxl"
+version = "0.1.0"
+description = "Fast SDXL inference, probably."
+authors = [{ name = "sekstini", email = "sekstinilol@gmail.com" }]
+readme = "README.md"
+license = { text = "MIT License" }
+
+requires-python = ">= 3.10"
+dependencies = ["torch>=2.2", "diffusers>=0.26"]
+
+[tool.black]
+line-length = 120
+
+[tool.ruff]
+line-length = 120
