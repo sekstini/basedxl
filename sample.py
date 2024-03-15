@@ -51,7 +51,12 @@ def main(
     )
 
     # Warmup
-    pipeline(prompt=prompt, negative_prompt=negative_prompt, guidance_scale=guidance_scale)
+    pipeline(
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        guidance_scale=guidance_scale,
+        num_inference_steps=10,
+    )
 
     # Generate
     torch.cuda.cudart().cudaProfilerStart()  # type: ignore
