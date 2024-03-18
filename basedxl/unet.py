@@ -7,11 +7,11 @@ from diffusers.models.modeling_utils import ModelMixin
 from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.attention_processor import Attention
 
-
 from basedxl.modules.attn import BasedXLCrossAttentionPP, BasedXLSelfAttentionPP
 from basedxl.modules.base_module import BaseModule
 from basedxl.modules.conv2d import BasedConv2dPP
 from basedxl.modules.groupnorm import BasedXLGroupNorm
+from basedxl.modules.lowp_linear import BasedXLLowPLinear
 from basedxl.utils import BasedXLConfig, PatchParallelismCommManager
 
 
@@ -66,7 +66,11 @@ class BasedXLUnet(BaseModel):
     def __init__(self, model: UNet2DConditionModel, basedxl_config: BasedXLConfig):
         assert isinstance(model, UNet2DConditionModel)
 
-        self._apply_patch_parallel_layers(model, basedxl_config)
+        if basedxl_config.patch_parallelism and basedxl_config.world_size > 1 and basedxl_config.n_device_per_batch > 1:
+            self.patch_pp_layers(model, basedxl_config)
+
+        if basedxl_config.fp16_acc_matmul:
+            self.patch_linear_layers(model)
 
         if basedxl_config.compile_unet:
             model.to(memory_format=torch.channels_last)  # type: ignore
@@ -74,30 +78,40 @@ class BasedXLUnet(BaseModel):
 
         super(BasedXLUnet, self).__init__(model, basedxl_config)
 
-    def _apply_patch_parallel_layers(self, model: UNet2DConditionModel, basedxl_config: BasedXLConfig):
-        if basedxl_config.world_size > 1 and basedxl_config.n_device_per_batch > 1:
-            for name, module in model.named_modules():
-                if isinstance(module, BaseModule):
-                    continue
-                for subname, submodule in module.named_children():
-                    if isinstance(submodule, nn.Conv2d):
-                        kernel_size = submodule.kernel_size
-                        if kernel_size == (1, 1) or kernel_size == 1:
-                            continue
-                        wrapped_submodule = BasedConv2dPP(
-                            submodule, basedxl_config, is_first_layer=subname == "conv_in"
-                        )
-                        setattr(module, subname, wrapped_submodule)
-                    elif isinstance(submodule, Attention):
-                        if subname == "attn1":  # self attention
-                            wrapped_submodule = BasedXLSelfAttentionPP(submodule, basedxl_config)
-                        else:  # cross attention
-                            assert subname == "attn2"
-                            wrapped_submodule = BasedXLCrossAttentionPP(submodule, basedxl_config)
-                        setattr(module, subname, wrapped_submodule)
-                    elif isinstance(submodule, nn.GroupNorm):
-                        wrapped_submodule = BasedXLGroupNorm(submodule, basedxl_config)
-                        setattr(module, subname, wrapped_submodule)
+    def patch_linear_layers(self, model: UNet2DConditionModel):
+        """Replace the layers in the model with the low precision (lowp) versions."""
+        for _name, module in model.named_modules():
+            for subname, submodule in module.named_children():
+                if isinstance(submodule, nn.Linear):  # and submodule.bias is None:
+                    wrapped_submodule = BasedXLLowPLinear(submodule)
+                    setattr(module, subname, wrapped_submodule)
+
+    def patch_pp_layers(self, model: UNet2DConditionModel, basedxl_config: BasedXLConfig):
+        """Replace the layers in the model with the patch parallel (pp) versions."""
+        for _name, module in model.named_modules():
+            if isinstance(module, BaseModule):
+                continue
+
+            for subname, submodule in module.named_children():
+                if isinstance(submodule, nn.Conv2d):
+                    kernel_size = submodule.kernel_size
+                    if kernel_size == (1, 1) or kernel_size == 1:
+                        continue
+                    wrapped_submodule = BasedConv2dPP(submodule, basedxl_config, is_first_layer=subname == "conv_in")
+                    setattr(module, subname, wrapped_submodule)
+
+                elif isinstance(submodule, Attention):
+                    if subname == "attn1":
+                        wrapped_submodule = BasedXLSelfAttentionPP(submodule, basedxl_config)
+                    elif subname == "attn2":
+                        wrapped_submodule = BasedXLCrossAttentionPP(submodule, basedxl_config)
+                    else:
+                        raise ValueError(f"Unknown attention layer: {subname}")
+                    setattr(module, subname, wrapped_submodule)
+
+                elif isinstance(submodule, nn.GroupNorm):
+                    wrapped_submodule = BasedXLGroupNorm(submodule, basedxl_config)
+                    setattr(module, subname, wrapped_submodule)
 
     @property
     def add_embedding(self):

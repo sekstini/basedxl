@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import torch
-from torch import distributed as dist
+import torch.distributed as dist
 from torch._C._distributed_c10d import Work, ProcessGroup  # type: ignore
 
 
@@ -9,6 +9,8 @@ from torch._C._distributed_c10d import Work, ProcessGroup  # type: ignore
 class BasedXLConfig:
     pretrained_model_name_or_path: str = "stabilityai/stable-diffusion-xl-base-1.0"
     dtype: torch.dtype = torch.float16
+    fp16_acc_matmul: bool = False
+    patch_parallelism: bool = False
     compile_unet: bool = False
     width: int = 1024
     height: int = 1024
@@ -23,6 +25,7 @@ class BasedXLConfig:
             self.rank = dist.get_rank()
             self.world_size = dist.get_world_size()
             self.device = f"cuda:{self.rank}"
+            torch.cuda.set_device(self.rank)
         except Exception:
             print("Failed to initialize distributed process group. Running in single-device mode.")
             self.rank = 0

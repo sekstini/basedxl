@@ -25,15 +25,21 @@ def main(
     num_inference_steps: int = 50,
     width: int = 1024,
     height: int = 1024,
-    compile: bool = False,
+    compile_unet: bool = False,
+    fp16_acc_matmul: bool = False,
+    patch_parallelism: bool = True,
     distrifusion_warmup_steps: int = 4,
     out_path: str = "sample.png",
     verbose: bool = False,
 ):
+    assert not (compile_unet and fp16_acc_matmul), "torch.compile currently breaks on user defined triton kernels."
+
     basedxl_config = BasedXLConfig(
         width=width,
         height=height,
-        compile_unet=compile,
+        compile_unet=compile_unet,
+        fp16_acc_matmul=fp16_acc_matmul,
+        patch_parallelism=patch_parallelism,
         warmup_steps=distrifusion_warmup_steps,
         verbose=verbose,
     )
@@ -51,7 +57,12 @@ def main(
     )
 
     # Warmup
-    pipeline(prompt=prompt, negative_prompt=negative_prompt, guidance_scale=guidance_scale)
+    pipeline(
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        guidance_scale=guidance_scale,
+        num_inference_steps=10,
+    )
 
     # Generate
     torch.cuda.cudart().cudaProfilerStart()  # type: ignore
