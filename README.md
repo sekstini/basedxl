@@ -1,6 +1,6 @@
 # BasedXL: Accelerated Stable Diffusion XL with Patch Parallelism
 
-BasedXL is a demo project that showcases the implementation of Patch Parallelism from the [DistriFusion paper](https://arxiv.org/abs/2402.19481) to speed up multi-GPU performance of Stable Diffusion XL with minimal quality degradation. This project is intended to be run locally and is not a full library.
+BasedXL is a demo project that showcases an implementation of Patch Parallelism from the [DistriFusion paper](https://arxiv.org/abs/2402.19481) to speed up multi-GPU performance of Stable Diffusion XL with minimal quality degradation. This project is intended to be run locally and is not a full library.
 
 ## Features
 
@@ -32,7 +32,7 @@ python sample.py
 ### Compile
 Optionally compile the UNet with torch.compile for a slight speedup. (warning: can take minute or two)
 ```bash
-torchrun --nproc-per-node=2 sample.py --compile
+torchrun --nproc-per-node=2 sample.py --compile_unet
 ```
 
 
